@@ -1,6 +1,7 @@
 import discord
 from discord.ext import commands
-client = commands.Bot(command_prefix = '/')
+
+client = commands.Bot(command_prefix = "/",intents=discord.Intents.all())
 
 @client.event
 async def on_ready():
@@ -8,7 +9,7 @@ async def on_ready():
     print("---------------------------")
     
 @client.command()
-async def isAwaken(ctx):
+async def hello(ctx):
     await ctx.send("haiii :3")
     
-client.run('MTI2NTQxNjQzNzQ4OTcyOTU2Nw.G651uw.2fP-EK2dqiwV0sTmXMLrwbzSKbnG7LqDJrwNXY')
+client.run("MTI2NTQxNjQzNzQ4OTcyOTU2Nw.GKKtCn.DJCP-Kz0x4SExn47HrnOa8EL3tlmw9SvIFdQjI")
