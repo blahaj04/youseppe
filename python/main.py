@@ -1,9 +1,8 @@
 import discord
 from discord.ext import commands
-from discord import app_commands
 from decouple import config
 
-client = commands.Bot(command_prefix = "/",intents=discord.Intents.all())
+client = commands.Bot(command_prefix = "!",intents=discord.Intents.all())
 botToken = config('YOUSEPPE_TOKEN')
 
 @client.event
@@ -43,9 +42,25 @@ async def play(ctx):
 @client.command(pass_context = True)
 async def stop(ctx):
     if(ctx.voice_client):
-        await ctx.guild.voice_disconnect()
+        await ctx.guild.voice_client.disconnect()
         print("me he salio")
     else:
-        await ctx.send("No estoy en ningun canal de voz. ¿Tan mal te caigo? :(")
+        await ctx.send("No estoy en ningun canal de voz. ¿Es que no me quieres aqui? :(")
+        
+@client.command(pass_context = True)
+async def pause(ctx):
+    voice = discord.utils.get(client.voice_clients,guild=ctx.guild)
+    if(voice.is_playing()):
+        voice.pause()
+    else:
+        await ctx.send("ZA WARUDO. Ups, solo funciona cuando reproduzco algo :(")
+        
+@client.command(pass_context = True)
+async def resume(ctx):
+    voice = discord.utils.get(client.voice_clients,guild=ctx.guild)
+    if(voice.is_paused()):
+        voice.resume()
+    else:
+        await ctx.send("TOKI WA UGOKIDASU. Upsie, primero tengo que parar algo, ¿no crees :p?")
 
 client.run(botToken)
