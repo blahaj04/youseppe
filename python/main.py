@@ -1,7 +1,9 @@
-import discord
+import discord, os
 from discord.ext import commands
+from dotenv import load_dotenv
 
 client = commands.Bot(command_prefix = "/",intents=discord.Intents.all())
+TOKEN = os.getenv("YOUSEPPE_TOKEN")
 
 @client.event
 async def on_ready():
@@ -12,4 +14,4 @@ async def on_ready():
 async def hello(ctx):
     await ctx.send("haiii :3")
     
-client.run("MTI2NTQxNjQzNzQ4OTcyOTU2Nw.GKKtCn.DJCP-Kz0x4SExn47HrnOa8EL3tlmw9SvIFdQjI")
+client.run(TOKEN)
