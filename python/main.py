@@ -29,5 +29,23 @@ async def haiii(ctx):
 @client.command()
 async def byeee(ctx):
     await ctx.send("byeee :3")
+    
+@client.command(pass_context = True)
+async def play(ctx):
+    if(ctx.author.voice):
+        channel = ctx.message.author.voice.channel
+        await channel.connect()
+        print("me he unio")
+    else:
+        await ctx.send("No estas en un canal de voz. ¡Necesito que estes en uno para que me pueda unir >:3 !")
+        
+
+@client.command(pass_context = True)
+async def stop(ctx):
+    if(ctx.voice_client):
+        await ctx.guild.voice_disconnect()
+        print("me he salio")
+    else:
+        await ctx.send("No estoy en ningun canal de voz. ¿Tan mal te caigo? :(")
 
 client.run(botToken)
