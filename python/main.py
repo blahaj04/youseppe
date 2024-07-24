@@ -7,7 +7,7 @@ botToken = config('YOUSEPPE_TOKEN')
 
 @client.event
 async def on_ready():
-    print("Youseppe está despierto ;3")
+    print("Youseppe esta despierto ;3")
     print("---------------------------")
     
 @client.command()
