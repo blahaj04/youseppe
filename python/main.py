@@ -22,12 +22,12 @@ async def on_member_leave(member):
     channel = client.get_channel(1265659906996961321)
     await channel.send(f"sacaio {member.name}")
 
-@client.event(name="haiii", description="Enviar un saludo")
-async def haiii(interaction: discord.Interaction):
-    await interaction.response.send_message("haiii :3")
+@client.command()
+async def haiii(ctx):
+    await ctx.send("haiii :3")
 
-@client.event(name="byeee", description="Enviar una despedida")
-async def byeee(interaction: discord.Interaction):
-    await interaction.response.send_message("byeee :3")
+@client.command()
+async def byeee(ctx):
+    await ctx.send("byeee :3")
 
 client.run(botToken)
