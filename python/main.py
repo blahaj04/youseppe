@@ -21,8 +21,6 @@ async def on_member_join(member):
 async def on_member_leave(member):
     channel = client.get_channel(1265659906996961321)
     await channel.send(f"sacaio {member.name}")
-   
-
 
 @client.event(name="haiii", description="Enviar un saludo")
 async def haiii(interaction: discord.Interaction):
