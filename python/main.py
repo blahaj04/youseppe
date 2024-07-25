@@ -1,6 +1,7 @@
 import discord
 import asyncio
 from discord.ext import commands
+from discord import FFmpegPCMAudio
 from decouple import config
 
 client = commands.Bot(command_prefix = "!",intents=discord.Intents.all())
@@ -31,7 +32,7 @@ async def haiii(ctx):
 @client.command()
 async def byeee(ctx):
     await ctx.send("byeee :3")
-
+    
 """""
 @client.command()
 async def chuerk(ctx):
