@@ -5,6 +5,7 @@ from decouple import config
 client = commands.Bot(command_prefix = "!",intents=discord.Intents.all())
 botToken = config('YOUSEPPE_TOKEN')
 
+#ACCIONES AUTOMÁTICAS
 @client.event
 async def on_ready():
     print("Youseppe esta despierto ;3")
@@ -21,6 +22,7 @@ async def on_member_leave(member):
     channel = client.get_channel(1265659906996961321)
     await channel.send(f"sacaio {member.name}")
 
+#COMANDOS DE TEXTO
 @client.command()
 async def haiii(ctx):
     await ctx.send("haiii :3")
@@ -29,6 +31,14 @@ async def haiii(ctx):
 async def byeee(ctx):
     await ctx.send("byeee :3")
     
+@client.command()
+async def chuerk(ctx):
+    input_file = r"F:\\GitHub\\youseppe\\youseppe\\python\\shrek1.txt"
+    with open(input_file, 'r') as infile:
+        for line in infile:
+            await ctx.send(line)
+
+#COMANDOS DE CHAT DE VOZ   
 @client.command(pass_context = True)
 async def play(ctx):
     if(ctx.author.voice):
@@ -38,7 +48,6 @@ async def play(ctx):
     else:
         await ctx.send("No estas en un canal de voz. ¡Necesito que estes en uno para que me pueda unir >:3 !")
         
-
 @client.command(pass_context = True)
 async def stop(ctx):
     if(ctx.voice_client):
@@ -51,7 +60,7 @@ async def stop(ctx):
 async def pause(ctx):
     voice = discord.utils.get(client.voice_clients,guild=ctx.guild)
     if(voice.is_playing()):
-        voice.pause()
+        voice.pause() 
     else:
         await ctx.send("ZA WARUDO. Ups, solo funciona cuando reproduzco algo :(")
         
@@ -62,5 +71,6 @@ async def resume(ctx):
         voice.resume()
     else:
         await ctx.send("TOKI WA UGOKIDASU. Upsie, primero tengo que parar algo, ¿no crees :p?")
+
 
 client.run(botToken)
