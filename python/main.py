@@ -21,7 +21,7 @@ ytdl_format_options = {
     'quiet': True,
     'no_warnings': True,
     'default_search': 'auto',
-    'source_address': '0.0.0.0'  # Bind to ipv4 since ipv6 addresses cause issues sometimes
+    'source_address': '10.28.1.14'  # Bind to ipv4 since ipv6 addresses cause issues sometimes
 }
 
 ffmpeg_options = {
@@ -92,8 +92,8 @@ async def stop(ctx):
 @client.command(pass_context=True)
 async def pause(ctx):
     voice = discord.utils.get(client.voice_clients, guild=ctx.guild)
-    if voice.is_playing():
-        voice.pause()
+    if ctx.voice_client and ctx.voice_client.is_playing():
+        ctx.voice_client.pause()
         await ctx.send("Música pausada.")
     else:
         await ctx.send("ZA WARUDO. Ups, solo funciona cuando reproduzco algo :(")
@@ -101,8 +101,8 @@ async def pause(ctx):
 @client.command(pass_context=True)
 async def resume(ctx):
     voice = discord.utils.get(client.voice_clients, guild=ctx.guild)
-    if voice.is_paused():
-        voice.resume()
+    if ctx.voice_client and ctx.voice_client.is_paused():
+        ctx.voice_client.resume()
     else:
         await ctx.send("TOKI WA UGOKIDASU. Upsie, primero tengo que parar algo, ¿no crees :p?")
 
