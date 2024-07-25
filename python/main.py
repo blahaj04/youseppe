@@ -32,7 +32,7 @@ class YTDLSource(discord.PCMVolumeTransformer):
 
         return cls(FFmpegPCMAudio(data['url']), data=data)
 
-# Bot commands and events
+#Eventos
 @client.event
 async def on_ready():
     print("Youseppe está despierto ;3")
@@ -50,6 +50,8 @@ async def on_member_leave(member):
     channel = client.get_channel(1265659906996961321)
     if channel:
         await channel.send(f"sacaio {member.name}")
+        
+#Comandos de texto
 
 @client.command()
 async def haiii(ctx):
@@ -58,6 +60,8 @@ async def haiii(ctx):
 @client.command()
 async def byeee(ctx):
     await ctx.send("byeee :3")
+
+#Comandos de voz
 
 @client.command()
 async def play(ctx: commands.Context, url: str):
@@ -68,7 +72,7 @@ async def play(ctx: commands.Context, url: str):
         try:
             player = await YTDLSource.from_url(url, loop=client.loop, stream=True)
             ctx.voice_client.play(player, after=lambda e: print(f'Player error: {e}') if e else None)
-            await ctx.send(f'Now playing: {player.data["title"]}')
+            await ctx.send(f'Reproduciendo ahora: {player.data["title"]}')
         except commands.CommandError as e:
             await ctx.send(f"An error occurred: {e}")
         except Exception as e:
