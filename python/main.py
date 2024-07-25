@@ -1,4 +1,5 @@
 import discord
+import asyncio
 from discord.ext import commands
 from decouple import config
 
@@ -30,13 +31,16 @@ async def haiii(ctx):
 @client.command()
 async def byeee(ctx):
     await ctx.send("byeee :3")
-    
+
+"""""
 @client.command()
 async def chuerk(ctx):
-    input_file = r"F:\\GitHub\\youseppe\\youseppe\\python\\shrek1.txt"
-    with open(input_file, 'r') as infile:
+    input_file = r"F:\GitHub\youseppe\youseppe\.txt\shrek1.txt"
+    with open(input_file, 'r', encoding='utf-8') as infile:
         for line in infile:
             await ctx.send(line)
+            await asyncio.sleep(2)
+"""""
 
 #COMANDOS DE CHAT DE VOZ   
 @client.command(pass_context = True)
