@@ -7,7 +7,7 @@ import yt_dlp as youtube_dl
 
 # Define the bot with all intents
 intents = discord.Intents.all()
-client = commands.Bot(command_prefix='!', intents=intents)
+client = commands.Bot(command_prefix='/', intents=intents)
 botToken = config('YOUSEPPE_TOKEN')
 
 # Configuration for yt_dlp
