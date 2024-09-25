@@ -11,6 +11,9 @@ client = commands.Bot(command_prefix='/', intents=intents)
 botToken = config('YOUSEPPE_TOKEN')
 chanelId = config('CARACU_ID')
 
+print(f"El ID del canal es: {chanelId}")
+
+
 # Configuration for yt_dlp
 class YTDLSource(discord.PCMVolumeTransformer):
     def __init__(self, source, *, data, volume=0.5):
