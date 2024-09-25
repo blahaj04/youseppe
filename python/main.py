@@ -4,14 +4,18 @@ from discord.ext import commands
 from discord import FFmpegPCMAudio
 from decouple import config
 import yt_dlp as youtube_dl
+import random
 
 # Define the bot with all intents
 intents = discord.Intents.all()
 client = commands.Bot(command_prefix='/', intents=intents)
-botToken = config('YOUSEPPE_TOKEN')
-chanelId = config('CARACU_ID')
+#botToken = config('YOUSEPPE_TOKEN')
+botToken = "MTI4NzgzMDc1MTE3MzE0ODY4Ng.GIl8ay.LDo8ZL6lG1TuNw5A9juItWfcL5IP-sxW_SWPK0"
+print(f"El token del bot es: {botToken}")
 
+chanelId = config('CARACU_ID')
 print(f"El ID del canal es: {chanelId}")
+
 
 
 # Configuration for yt_dlp
@@ -118,9 +122,10 @@ async def ensure_voice(ctx: commands.Context):
 
 
 @client.command()
-async def caracu(ctx, member: discord.Member):
+async def caracu(ctx: commands.Context, member: discord.Member):
     # Obtén el canal de voz usando el ID
-    channel = client.get_channel(chanelId)
+    #channel = client.get_channel(chanelId)
+    channel = client.get_channel(826925751441293363)
 
     if channel is None or not isinstance(channel, discord.VoiceChannel):
         await ctx.send(f'El canal de voz con ID "{channel}" no existe o no es un canal de voz.')
@@ -132,10 +137,21 @@ async def caracu(ctx, member: discord.Member):
 
     # Mueve al miembro al canal de voz especificado
     await member.move_to(channel)
-    await ctx.send(f'{member.name} ha sido movido al canal de voz {channel.name}')
+    await ctx.send(f'Merecido caracu {member.name}')
 
-    # Envía un GIF al canal de texto desde donde se llamó el comando
-    gif_url = "https://images-ext-1.discordapp.net/external/g5_hePq6C1KzP6TQADBc6arIlQ_zmxYY8zIw8PD1rcc/https/media.tenor.com/y5iSFIAct-EAAAPo/my-honest-reaction-my-reaction.mp4"  # Aquí puedes poner cualquier URL de un GIF
-    await ctx.send(f"{member.name} ha sido movido.", file=discord.File(gif_url))
+     # Leer el archivo de GIFs y seleccionar uno al azar
+    try:
+        with open("./.txt/gifs.txt", "r") as file:
+            gifs = file.readlines()
+        
+        if gifs:
+            gif_url = random.choice(gifs).strip()  # Selecciona un GIF aleatorio y elimina espacios en blanco
+            await ctx.send(gif_url)  # Envía el enlace del GIF seleccionado
+        else:
+            await ctx.send("No se encontraron GIFs en el archivo.")
+    except FileNotFoundError:
+        await ctx.send("El archivo de GIFs no fue encontrado.")
+    except Exception as e:
+        await ctx.send(f"Ocurrió un error: {e}")
     
 client.run(botToken)
