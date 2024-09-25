@@ -9,6 +9,7 @@ import yt_dlp as youtube_dl
 intents = discord.Intents.all()
 client = commands.Bot(command_prefix='/', intents=intents)
 botToken = config('YOUSEPPE_TOKEN')
+chanelId = config('CARACU_ID')
 
 # Configuration for yt_dlp
 class YTDLSource(discord.PCMVolumeTransformer):
@@ -46,7 +47,7 @@ async def on_member_join(member):
         await channel.send(f"tevacae {member.name}")
 
 @client.event
-async def on_member_leave(member):
+async def on_member_ban(member):
     channel = client.get_channel(1265659906996961321)
     if channel:
         await channel.send(f"sacaio {member.name}")
@@ -112,4 +113,26 @@ async def ensure_voice(ctx: commands.Context):
     elif ctx.voice_client.is_playing():
         ctx.voice_client.stop()
 
+
+@client.command()
+async def caracu(ctx, member: discord.Member):
+    # Obtén el canal de voz usando el ID
+    channel = client.get_channel(chanelId)
+
+    if channel is None or not isinstance(channel, discord.VoiceChannel):
+        await ctx.send(f'El canal de voz con ID "{channel}" no existe o no es un canal de voz.')
+        return
+
+    if not member.voice:
+        await ctx.send(f'{member.name} no está en ningún canal de voz.')
+        return
+
+    # Mueve al miembro al canal de voz especificado
+    await member.move_to(channel)
+    await ctx.send(f'{member.name} ha sido movido al canal de voz {channel.name}')
+
+    # Envía un GIF al canal de texto desde donde se llamó el comando
+    gif_url = "https://images-ext-1.discordapp.net/external/g5_hePq6C1KzP6TQADBc6arIlQ_zmxYY8zIw8PD1rcc/https/media.tenor.com/y5iSFIAct-EAAAPo/my-honest-reaction-my-reaction.mp4"  # Aquí puedes poner cualquier URL de un GIF
+    await ctx.send(f"{member.name} ha sido movido.", file=discord.File(gif_url))
+    
 client.run(botToken)
