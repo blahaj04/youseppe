@@ -7,16 +7,11 @@ import yt_dlp as youtube_dl
 import random
 
 # Define the bot with all intents
+
 intents = discord.Intents.all()
 client = commands.Bot(command_prefix='/', intents=intents)
 #botToken = config('YOUSEPPE_TOKEN')
 botToken = "MTI4NzgzMDc1MTE3MzE0ODY4Ng.GIl8ay.LDo8ZL6lG1TuNw5A9juItWfcL5IP-sxW_SWPK0"
-print(f"El token del bot es: {botToken}")
-
-chanelId = config('CARACU_ID')
-print(f"El ID del canal es: {chanelId}")
-
-
 
 # Configuration for yt_dlp
 class YTDLSource(discord.PCMVolumeTransformer):
@@ -49,13 +44,13 @@ async def on_ready():
 
 @client.event
 async def on_member_join(member):
-    channel = client.get_channel(1265659906996961321)
+    channel = client.get_channel(int(config('BIENVENIDO_ID')))
     if channel:
         await channel.send(f"tevacae {member.name}")
 
 @client.event
 async def on_member_ban(member):
-    channel = client.get_channel(1265659906996961321)
+    channel = client.get_channel(int(config('BIENVENIDO_ID')))
     if channel:
         await channel.send(f"sacaio {member.name}")
         
@@ -125,7 +120,7 @@ async def ensure_voice(ctx: commands.Context):
 async def caracu(ctx: commands.Context, member: discord.Member):
     # Obtén el canal de voz usando el ID
     #channel = client.get_channel(chanelId)
-    channel = client.get_channel(826925751441293363)
+    channel = client.get_channel(int(config('CARACU_ID')))
 
     if channel is None or not isinstance(channel, discord.VoiceChannel):
         await ctx.send(f'El canal de voz con ID "{channel}" no existe o no es un canal de voz.')
