@@ -9,7 +9,7 @@ import random
 # Define the bot with all intents
 
 intents = discord.Intents.all()
-client = commands.Bot(command_prefix='/', intents=intents)
+client = commands.Bot(command_prefix='!', intents=intents)
 #botToken = config('YOUSEPPE_TOKEN')
 botToken = "MTI4NzgzMDc1MTE3MzE0ODY4Ng.GIl8ay.LDo8ZL6lG1TuNw5A9juItWfcL5IP-sxW_SWPK0"
 
