@@ -12,6 +12,9 @@ client = commands.Bot(command_prefix='!', intents=intents)
 # botToken = config('YOUSEPPE_TOKEN')
 botToken = "MTI4NzgzMDc1MTE3MzE0ODY4Ng.GIl8ay.LDo8ZL6lG1TuNw5A9juItWfcL5IP-sxW_SWPK0"
 
+# Cola de reproducción
+queue = []  # Lista vacía para la cola de canciones
+
 # Configuration for yt_dlp
 class YTDLSource(discord.PCMVolumeTransformer):
     def __init__(self, source, *, data, volume=0.5):
@@ -26,13 +29,12 @@ class YTDLSource(discord.PCMVolumeTransformer):
             'nocheckcertificate': True,
             'quiet': True,
             'default_search': 'auto',
-            'source_address': '0.0.0.0'  # Opcional, resuelve problemas de conexión en algunos sistemas
+            'source_address': '0.0.0.0'
         }
 
         ytdl = youtube_dl.YoutubeDL(ytdl_opts)
         loop = loop or asyncio.get_event_loop()
         
-        # Opciones de FFmpeg para reconexión automática
         ffmpeg_opts = {
             'before_options': (
                 '-reconnect 1 -reconnect_streamed 1 '
@@ -53,58 +55,44 @@ class YTDLSource(discord.PCMVolumeTransformer):
 
         filename = data['url'] if stream else ytdl.prepare_filename(data)
 
-        # Agregar las opciones de reconexión a FFmpegPCMAudio
         return cls(FFmpegPCMAudio(filename, **ffmpeg_opts), data=data)
 
-#Eventos
+# Manejar el fin de una canción y pasar a la siguiente en la cola
+def play_next(ctx):
+    if len(queue) > 0:
+        next_song = queue.pop(0)  # Toma la siguiente canción de la cola
+        client.loop.create_task(play_song(ctx, next_song))
+
+async def play_song(ctx, song):
+    try:
+        player = await YTDLSource.from_url(song, loop=client.loop, stream=True)
+        ctx.voice_client.play(player, after=lambda e: play_next(ctx))
+        await ctx.send(f'Reproduciendo ahora: {player.data["title"]}')
+    except commands.CommandError as e:
+        await ctx.send(f"An error occurred: {e}")
+    except Exception as e:
+        await ctx.send(f"Unexpected error: {e}")
+
+# Eventos
 @client.event
 async def on_ready():
     print("Youseppe está despierto ;3")
     print("---------------------------")
     await client.tree.sync()
 
-@client.event
-async def on_member_join(member):
-    channel = client.get_channel(int(config('BIENVENIDO_ID')))
-    if channel:
-        await channel.send(f"tevacae {member.name}")
-
-@client.event
-async def on_member_ban(member):
-    channel = client.get_channel(int(config('BIENVENIDO_ID')))
-    if channel:
-        await channel.send(f"sacaio {member.name}")
-        
-# Comandos de texto
-
-@client.command()
-async def haiii(ctx):
-    await ctx.send("haiii :3")
-
-@client.command()
-async def byeee(ctx):
-    await ctx.send("byeee :3")
-
-# Comandos de voz
-
+# Comando para reproducir una canción y agregarla a la cola si ya hay una en curso
 @client.command()
 async def play(ctx: commands.Context, url: str):
     if ctx.voice_client and ctx.voice_client.is_playing():
-        ctx.voice_client.stop()
-
-    async with ctx.typing():
-        try:
-            player = await YTDLSource.from_url(url, loop=client.loop, stream=True)
-            ctx.voice_client.play(player, after=lambda e: print(f'Player error: {e}') if e else None)
-            await ctx.send(f'Reproduciendo ahora: {player.data["title"]}')
-        except commands.CommandError as e:
-            await ctx.send(f"An error occurred: {e}")
-        except Exception as e:
-            await ctx.send(f"Unexpected error: {e}")
+        queue.append(url)  # Agrega la canción a la cola
+        await ctx.send(f'Se ha agregado a la cola: {url}')
+    else:
+        await play_song(ctx, url)
 
 @client.command()
 async def stop(ctx: commands.Context):
     if ctx.voice_client:
+        queue.clear()  # Vacía la cola cuando se detiene la reproducción
         await ctx.voice_client.disconnect()
     else:
         await ctx.send("No estoy en ningun canal de voz. ¿Es que no me quieres aqui? :(")
@@ -136,36 +124,22 @@ async def ensure_voice(ctx: commands.Context):
     elif ctx.voice_client.is_playing():
         ctx.voice_client.stop()
 
+# Nuevo comando para ver la cola de canciones
 @client.command()
-async def caracu(ctx: commands.Context, member: discord.Member):
-    # Obtén el canal de voz usando el ID
-    channel = client.get_channel(int(config('CARACU_ID')))
+async def queue_list(ctx: commands.Context):
+    if len(queue) == 0:
+        await ctx.send("No hay canciones en la cola.")
+    else:
+        queue_display = "\n".join([f"{i + 1}. {url}" for i, url in enumerate(queue)])
+        await ctx.send(f"Cola de canciones:\n{queue_display}")
 
-    if channel is None or not isinstance(channel, discord.VoiceChannel):
-        await ctx.send(f'El canal de voz con ID "{channel}" no existe o no es un canal de voz.')
-        return
+# Nuevo comando para saltar la canción actual
+@client.command()
+async def skip(ctx: commands.Context):
+    if ctx.voice_client and ctx.voice_client.is_playing():
+        ctx.voice_client.stop()  # Detiene la canción actual y desencadena `play_next`
+        await ctx.send("Canción saltada. Reproduciendo la siguiente en la cola...")
+    else:
+        await ctx.send("No hay ninguna canción reproduciéndose en este momento.")
 
-    if not member.voice:
-        await ctx.send(f'{member.name} no está en ningún canal de voz.')
-        return
-
-    # Mueve al miembro al canal de voz especificado
-    await member.move_to(channel)
-    await ctx.send(f'Merecido caracu {member.name}')
-
-    # Leer el archivo de GIFs y seleccionar uno al azar
-    try:
-        with open("./.txt/gifs.txt", "r") as file:
-            gifs = file.readlines()
-        
-        if gifs:
-            gif_url = random.choice(gifs).strip()  # Selecciona un GIF aleatorio y elimina espacios en blanco
-            await ctx.send(gif_url)  # Envía el enlace del GIF seleccionado
-        else:
-            await ctx.send("No se encontraron GIFs en el archivo.")
-    except FileNotFoundError:
-        await ctx.send("El archivo de GIFs no fue encontrado.")
-    except Exception as e:
-        await ctx.send(f"Ocurrió un error: {e}")
-    
 client.run(botToken)
