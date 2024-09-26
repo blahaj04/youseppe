@@ -11,9 +11,10 @@ intents = discord.Intents.all()
 client = commands.Bot(command_prefix='!', intents=intents)
 # botToken = config('YOUSEPPE_TOKEN')
 botToken = "MTI4NzgzMDc1MTE3MzE0ODY4Ng.GIl8ay.LDo8ZL6lG1TuNw5A9juItWfcL5IP-sxW_SWPK0"
+isPlaying = False
 
-# Cola de reproducción
-queue = []  # Lista vacía para la cola de canciones
+# Cola de reproducción (ahora con tuplas para almacenar url y título)
+queue = []
 
 # Configuration for yt_dlp
 class YTDLSource(discord.PCMVolumeTransformer):
@@ -57,45 +58,124 @@ class YTDLSource(discord.PCMVolumeTransformer):
 
         return cls(FFmpegPCMAudio(filename, **ffmpeg_opts), data=data)
 
-# Manejar el fin de una canción y pasar a la siguiente en la cola
-def play_next(ctx):
-    if len(queue) > 0:
-        next_song = queue.pop(0)  # Toma la siguiente canción de la cola
-        client.loop.create_task(play_song(ctx, next_song))
+# Funcinones asincronas----------------------------------------------------------------------------------
+async def play_next(ctx):
+    global isPlaying
+    
+    if len(queue) == 0:
+        isPlaying = False  # No hay más canciones en la cola
+        return
 
-async def play_song(ctx, song):
+    
+    next_song_url = queue.pop(0)  # Obtiene y elimina la primera canción de la cola
+    await play_song(ctx, next_song_url)  
+
+async def play_song(ctx, url):
+    global isPlaying
+    
+    
     try:
-        player = await YTDLSource.from_url(song, loop=client.loop, stream=True)
-        ctx.voice_client.play(player, after=lambda e: play_next(ctx))
-        await ctx.send(f'Reproduciendo ahora: {player.data["title"]}')
+        
+        ytdl = youtube_dl.YoutubeDL({'format': 'bestaudio/best'})
+        info = ytdl.extract_info(url, download=False)
+        title = info['title']  
+        duration = info['duration']
+
+        
+        player = await YTDLSource.from_url(url, loop=client.loop, stream=True)
+        ctx.voice_client.play(player)
+        
+        isPlaying = True
+        await ctx.send(f'Reproduciendo ahora: {title}, {url}')
+
+        await asyncio.sleep(duration + 1)  # Espera la duración de la canción + 1 segundo
+        isPlaying = False
+
+        await play_next(ctx)  # Llama a play_next después de que la canción termine
+
     except commands.CommandError as e:
         await ctx.send(f"An error occurred: {e}")
     except Exception as e:
         await ctx.send(f"Unexpected error: {e}")
-
-# Eventos
+    
+        
+# Eventos-----------------------------------------------------------------------------------------
 @client.event
 async def on_ready():
     print("Youseppe está despierto ;3")
     print("---------------------------")
     await client.tree.sync()
+    
+@client.event
+async def on_member_join(member):
+    channel = client.get_channel(int(config('BIENVENIDO_ID')))
+    if channel:
+        await channel.send(f"tevacae {member.name}")
 
-# Comando para reproducir una canción y agregarla a la cola si ya hay una en curso
+@client.event
+async def on_member_ban(member):
+    channel = client.get_channel(int(config('BIENVENIDO_ID')))
+    if channel:
+        await channel.send(f"sacaio {member.name}")
+        
+# Comandos de texto--------------------------------------------------------------------------
+
+@client.command()
+async def haiii(ctx):
+    await ctx.send("haiii :3")
+
+@client.command()
+async def byeee(ctx):
+    await ctx.send("byeee :3")
+
+# Comandos de voz----------------------------------------------------------------------------
+    
+    
 @client.command()
 async def play(ctx: commands.Context, url: str):
-    if ctx.voice_client and ctx.voice_client.is_playing():
-        queue.append(url)  # Agrega la canción a la cola
-        await ctx.send(f'Se ha agregado a la cola: {url}')
-    else:
-        await play_song(ctx, url)
+    
+    global isPlaying
+            
+    if ctx.voice_client is None or not ctx.voice_client.is_connected():
+        if ctx.author.voice:
+            await ctx.author.voice.channel.connect()
+        else:
+            await ctx.send("No estás en ningún canal de voz. No puedo reproducir nada sin ti :(")
+            return
 
+    if len(queue) == 0:
+        
+        queue.append(url)  # Agrega la URL a la cola
+    
+    if isPlaying:
+        await play_song(ctx,url)
+        
+    
+    await play_next(ctx)
+   
+@client.command()
+async def add(ctx: commands.Context, url: str):
+    queue.append(url)  # Agrega la URL a la cola
+    await ctx.send(f'Se ha agregado a la cola: {url}')
+    
 @client.command()
 async def stop(ctx: commands.Context):
+    global isPlaying  # Asegúrate de que sea la variable global
     if ctx.voice_client:
         queue.clear()  # Vacía la cola cuando se detiene la reproducción
         await ctx.voice_client.disconnect()
+        isPlaying = False  # Cambia a False al detener la música
     else:
         await ctx.send("No estoy en ningun canal de voz. ¿Es que no me quieres aqui? :(")
+
+@client.command()
+async def skip(ctx: commands.Context):
+    if ctx.voice_client and ctx.voice_client.is_playing():
+        ctx.voice_client.stop()  # Detiene la canción actual
+        await ctx.send("Canción saltada. Reproduciendo la siguiente en la cola...")
+        await play_next(ctx)
+    else:
+        await ctx.send("No hay ninguna canción reproduciéndose en este momento.")
 
 @client.command()
 async def pause(ctx: commands.Context):
@@ -124,22 +204,38 @@ async def ensure_voice(ctx: commands.Context):
     elif ctx.voice_client.is_playing():
         ctx.voice_client.stop()
 
-# Nuevo comando para ver la cola de canciones
-@client.command()
-async def queue_list(ctx: commands.Context):
-    if len(queue) == 0:
-        await ctx.send("No hay canciones en la cola.")
-    else:
-        queue_display = "\n".join([f"{i + 1}. {url}" for i, url in enumerate(queue)])
-        await ctx.send(f"Cola de canciones:\n{queue_display}")
+#Comandos grasiosos----------------------------------------------------------------------------------
 
-# Nuevo comando para saltar la canción actual
 @client.command()
-async def skip(ctx: commands.Context):
-    if ctx.voice_client and ctx.voice_client.is_playing():
-        ctx.voice_client.stop()  # Detiene la canción actual y desencadena `play_next`
-        await ctx.send("Canción saltada. Reproduciendo la siguiente en la cola...")
-    else:
-        await ctx.send("No hay ninguna canción reproduciéndose en este momento.")
+async def caracu(ctx: commands.Context, member: discord.Member):
+    # Obtén el canal de voz usando el ID
+    #channel = client.get_channel(chanelId)
+    channel = client.get_channel(int(config('CARACU_ID')))
 
+    if channel is None or not isinstance(channel, discord.VoiceChannel):
+        await ctx.send(f'El canal de voz con ID "{channel}" no existe o no es un canal de voz.')
+        return
+
+    if not member.voice:
+        await ctx.send(f'{member.name} no está en ningún canal de voz.')
+        return
+
+    # Mueve al miembro al canal de voz especificado
+    await member.move_to(channel)
+    await ctx.send(f'Merecido caracu {member.name}')
+
+     # Leer el archivo de GIFs y seleccionar uno al azar
+    try:
+        with open("./.txt/gifs.txt", "r") as file:
+            gifs = file.readlines()
+        
+        if gifs:
+            gif_url = random.choice(gifs).strip()  # Selecciona un GIF aleatorio y elimina espacios en blanco
+            await ctx.send(gif_url)  # Envía el enlace del GIF seleccionado
+        else:
+            await ctx.send("No se encontraron GIFs en el archivo.")
+    except FileNotFoundError:
+        await ctx.send("El archivo de GIFs no fue encontrado.")
+    except Exception as e:
+        await ctx.send(f"Ocurrió un error: {e}")
 client.run(botToken)
