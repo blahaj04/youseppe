@@ -228,9 +228,10 @@ async def caracu(ctx: commands.Context, member: discord.Member):
     try:
         with open("./.txt/gifs.txt", "r") as file:
             gifs = file.readlines()
-        
+            print(gifs)
         if gifs:
-            gif_url = random.choice(gifs).strip()  # Selecciona un GIF aleatorio y elimina espacios en blanco
+            gif_url = random.choice(gifs)
+            print(gif_url)
             await ctx.send(gif_url)  # Envía el enlace del GIF seleccionado
         else:
             await ctx.send("No se encontraron GIFs en el archivo.")
