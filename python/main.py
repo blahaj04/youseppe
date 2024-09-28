@@ -6,11 +6,15 @@ from decouple import config
 import yt_dlp as youtube_dl
 import random
 
+
+botToken = 'MTI4NzgzMDc1MTE3MzE0ODY4Ng.Gcx7j0.0EwRt2JO4f7RJNWeoMuzfDCdnoYdbB80bYdK98'
+#botToken = config('YOUSEPPE_TOKEN')
+#print(botToken)
+
 # Define the bot with all intents
 intents = discord.Intents.all()
 client = commands.Bot(command_prefix='!', intents=intents)
-# botToken = config('YOUSEPPE_TOKEN')
-botToken = "MTI4NzgzMDc1MTE3MzE0ODY4Ng.GIl8ay.LDo8ZL6lG1TuNw5A9juItWfcL5IP-sxW_SWPK0"
+
 isPlaying = False
 
 # Cola de reproducción (ahora con tuplas para almacenar url y título)
