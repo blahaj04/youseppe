@@ -210,12 +210,12 @@ async def ensure_voice(ctx: commands.Context):
 
 #Comandos grasiosos----------------------------------------------------------------------------------
 
+
 @client.command()
 async def caracu(ctx: commands.Context, member: discord.Member):
     # Obtén el canal de voz usando el ID
-    #channel = client.get_channel(chanelId)
     channel = client.get_channel(int(config('CARACU_ID')))
-
+    
     if channel is None or not isinstance(channel, discord.VoiceChannel):
         await ctx.send(f'El canal de voz con ID "{channel}" no existe o no es un canal de voz.')
         return
@@ -224,18 +224,18 @@ async def caracu(ctx: commands.Context, member: discord.Member):
         await ctx.send(f'{member.name} no está en ningún canal de voz.')
         return
 
+    original_channel = member.voice.channel  # Guardar el canal original del miembro
+
     # Mueve al miembro al canal de voz especificado
     await member.move_to(channel)
     await ctx.send(f'Merecido caracu {member.name}')
 
-     # Leer el archivo de GIFs y seleccionar uno al azar
+    # Leer el archivo de GIFs y seleccionar uno al azar
     try:
         with open("./.txt/gifs.txt", "r") as file:
             gifs = file.readlines()
-            print(gifs)
         if gifs:
-            gif_url = random.choice(gifs)
-            print(gif_url)
+            gif_url = random.choice(gifs).strip()  # Selecciona un GIF aleatorio y elimina espacios en blanco
             await ctx.send(gif_url)  # Envía el enlace del GIF seleccionado
         else:
             await ctx.send("No se encontraron GIFs en el archivo.")
@@ -243,4 +243,11 @@ async def caracu(ctx: commands.Context, member: discord.Member):
         await ctx.send("El archivo de GIFs no fue encontrado.")
     except Exception as e:
         await ctx.send(f"Ocurrió un error: {e}")
-client.run(botToken)
+
+    # Espera 10 segundos antes de devolver al miembro al canal original
+    await asyncio.sleep(10)
+
+    if original_channel is not None:  # Asegúrate de que el canal original sigue siendo válido
+        await member.move_to(original_channel)  # Devuelve al miembro a su canal de voz original
+        await ctx.send(f'{member.name} ha sido devuelto a su canal original.')
+
