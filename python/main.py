@@ -210,6 +210,7 @@ async def ensure_voice(ctx: commands.Context):
 
 #Comandos grasiosos----------------------------------------------------------------------------------
 
+
 @client.command()
 async def caracu(ctx: commands.Context, member: discord.Member):
     # Obtén el canal de voz usando el ID
@@ -249,4 +250,8 @@ async def caracu(ctx: commands.Context, member: discord.Member):
     if original_channel is not None:  # Asegúrate de que el canal original sigue siendo válido
         await member.move_to(original_channel)  # Devuelve al miembro a su canal de voz original
         await ctx.send(f'{member.name} ha sido devuelto a su canal original.')
+<<<<<<< HEAD
 client.run(botToken)
+=======
+
+>>>>>>> 2c4c20b49765e45dff8335c3ea50b674951fc788
