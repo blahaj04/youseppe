@@ -62,9 +62,19 @@ class YTDLSource(discord.PCMVolumeTransformer):
         filename = data['url'] if stream else ytdl.prepare_filename(data)
 
         return cls(FFmpegPCMAudio(filename, **ffmpeg_opts), data=data)
-    
 
 # Funcinones asincronas----------------------------------------------------------------------------------
+async def play_next(ctx):
+    global isPlaying
+    
+    if len(queue) == 0:
+        isPlaying = False  # No hay más canciones en la cola
+        return
+
+    
+    next_song_url = queue.pop(0)  # Obtiene y elimina la primera canción de la cola
+    await play_song(ctx, next_song_url)  
+
 async def play_song(ctx, url):
     global isPlaying
 
