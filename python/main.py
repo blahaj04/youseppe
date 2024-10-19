@@ -93,7 +93,7 @@ async def play_song(ctx, url):
                     '-reconnect 1 -reconnect_streamed 1 '
                     '-reconnect_delay_max 5'
                 ),
-                'options': '-vn -b:a 64k'  # Cambia la calidad aquí
+                'options': '-vn -b:a 256K'  # Cambia la calidad aquí
             })
         )
 
