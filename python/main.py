@@ -84,17 +84,18 @@ async def play_song(ctx, url):
         title = info['title']
         duration = info['duration']
 
-        ffmpeg_opts = {
-            'before_options': (
-                '-reconnect 1 -reconnect_streamed 1 '
-                '-reconnect_delay_max 5'
-            ),
-            'options': '-vn',
-            'audio_bitrate': '64k'  # Cambia la calidad aquí
-        }
-
         player = await YTDLSource.from_url(url, loop=client.loop, stream=True)
-        ctx.voice_client.play(FFmpegPCMAudio(player.source, **ffmpeg_opts))
+
+        # Modifica aquí para ajustar la calidad de audio a 64 kbps
+        ctx.voice_client.play(
+            FFmpegPCMAudio(player.data['url'], **{
+                'before_options': (
+                    '-reconnect 1 -reconnect_streamed 1 '
+                    '-reconnect_delay_max 5'
+                ),
+                'options': '-vn -b:a 64k'  # Cambia la calidad aquí
+            })
+        )
 
         isPlaying = True
         await ctx.send(f'Reproduciendo ahora: {title}, {url}')
