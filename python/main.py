@@ -244,14 +244,11 @@ async def caracu(ctx: commands.Context, member: discord.Member):
     except Exception as e:
         await ctx.send(f"Ocurrió un error: {e}")
 
-    # Espera 10 segundos antes de devolver al miembro al canal original
-    await asyncio.sleep(10)
+    # Espera 5 segundos antes de devolver al miembro al canal original
+    await asyncio.sleep(5)
 
     if original_channel is not None:  # Asegúrate de que el canal original sigue siendo válido
         await member.move_to(original_channel)  # Devuelve al miembro a su canal de voz original
         await ctx.send(f'{member.name} ha sido devuelto a su canal original.')
-<<<<<<< HEAD
-client.run(botToken)
-=======
 
->>>>>>> 2c4c20b49765e45dff8335c3ea50b674951fc788
+client.run(botToken)
