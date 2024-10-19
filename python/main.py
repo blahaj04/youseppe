@@ -64,32 +64,27 @@ class YTDLSource(discord.PCMVolumeTransformer):
         return cls(FFmpegPCMAudio(filename, **ffmpeg_opts), data=data)
 
 # Funcinones asincronas----------------------------------------------------------------------------------
-async def play_next(ctx):
-    global isPlaying
-    
-    if len(queue) == 0:
-        isPlaying = False  # No hay más canciones en la cola
-        return
-
-    
-    next_song_url = queue.pop(0)  # Obtiene y elimina la primera canción de la cola
-    await play_song(ctx, next_song_url)  
-
 async def play_song(ctx, url):
     global isPlaying
-    
-    
+
     try:
-        
         ytdl = youtube_dl.YoutubeDL({'format': 'bestaudio/best'})
         info = ytdl.extract_info(url, download=False)
-        title = info['title']  
+        title = info['title']
         duration = info['duration']
 
-        
+        ffmpeg_opts = {
+            'before_options': (
+                '-reconnect 1 -reconnect_streamed 1 '
+                '-reconnect_delay_max 5'
+            ),
+            'options': '-vn',
+            'audio_bitrate': '64k'  # Cambia la calidad aquí
+        }
+
         player = await YTDLSource.from_url(url, loop=client.loop, stream=True)
-        ctx.voice_client.play(player)
-        
+        ctx.voice_client.play(FFmpegPCMAudio(player.source, **ffmpeg_opts))
+
         isPlaying = True
         await ctx.send(f'Reproduciendo ahora: {title}, {url}')
 
@@ -102,6 +97,7 @@ async def play_song(ctx, url):
         await ctx.send(f"An error occurred: {e}")
     except Exception as e:
         await ctx.send(f"Unexpected error: {e}")
+
     
         
 # Eventos-----------------------------------------------------------------------------------------
