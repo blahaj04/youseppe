@@ -5,7 +5,8 @@ from discord import FFmpegPCMAudio
 from decouple import config
 import yt_dlp as youtube_dl
 import random
-
+from flask import Flask
+from threading import Thread
 
 
 botToken = config('YOUSEPPE_TOKEN')
@@ -272,5 +273,20 @@ async def caracu(ctx: commands.Context, member: discord.Member):
         await member.move_to(original_channel)  # Devuelve al miembro a su canal de voz original
         await ctx.send(f'{member.name} ha sido devuelto a su canal original.')
 
+#No AFK----------------------------------------------------------------------------------
+app = Flask('')
+
+@app.route('/')
+def home():
+    return "Bot is alive!"
+
+def run():
+    app.run(host='0.0.0.0', port=8080)
+
+def keep_alive():
+    t = Thread(target=run)
+    t.start()
+
+keep_alive()
 
 client.run(botToken)
