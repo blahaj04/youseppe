@@ -7,9 +7,9 @@ import yt_dlp as youtube_dl
 import random
 
 
-botToken = 'MTI4NzgzMDc1MTE3MzE0ODY4Ng.Gcx7j0.0EwRt2JO4f7RJNWeoMuzfDCdnoYdbB80bYdK98'
-#botToken = config('YOUSEPPE_TOKEN')
-#print(botToken)
+
+botToken = config('YOUSEPPE_TOKEN')
+print(botToken)
 
 # Define the bot with all intents
 intents = discord.Intents.all()
