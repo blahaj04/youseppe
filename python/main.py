@@ -134,12 +134,11 @@ async def byeee(ctx):
 
 # Comandos de voz----------------------------------------------------------------------------
     
-    
+
 @client.command()
 async def play(ctx: commands.Context, url: str):
-    
     global isPlaying
-            
+
     if ctx.voice_client is None or not ctx.voice_client.is_connected():
         if ctx.author.voice:
             await ctx.author.voice.channel.connect()
@@ -147,15 +146,37 @@ async def play(ctx: commands.Context, url: str):
             await ctx.send("No estás en ningún canal de voz. No puedo reproducir nada sin ti :(")
             return
 
-    if len(queue) == 0:
+    ytdl_opts = {
+        'format': 'bestaudio/best',
+        'noplaylist': False,  # Permitir listas de reproducción
+        'quiet': True,
+        'default_search': 'auto',
+        'source_address': '0.0.0.0'
+    }
+
+    ytdl = youtube_dl.YoutubeDL(ytdl_opts)
+
+    try:
+        info = ytdl.extract_info(url, download=False)
         
-        queue.append(url)  # Agrega la URL a la cola
-    
-    if isPlaying:
-        await play_song(ctx,url)
+        if 'entries' in info:  # Si es una lista de reproducción
+            playlist = info['entries']
+            await ctx.send(f'Lista de reproducción agregada con {len(playlist)} canciones.')
+
+            for entry in playlist:
+                video_url = entry['url']
+                queue.append(video_url)  # Agregar la URL del video a la cola
+                await ctx.send(f'Se agregó a la cola: {entry["title"]}')  # Muestra el título de cada video agregado
+        else:
+            queue.append(url)  # Agregar una sola canción si no es lista
+            await ctx.send(f'Se ha agregado a la cola: {info["title"]}')
         
-    
-    await play_next(ctx)
+        if not isPlaying:
+            await play_next(ctx)  # Comienza a reproducir la primera canción si no hay otra en curso
+
+    except Exception as e:
+        await ctx.send(f"Error al procesar la lista de reproducción o URL: {e}")
+
    
 @client.command()
 async def add(ctx: commands.Context, url: str):
@@ -250,5 +271,6 @@ async def caracu(ctx: commands.Context, member: discord.Member):
     if original_channel is not None:  # Asegúrate de que el canal original sigue siendo válido
         await member.move_to(original_channel)  # Devuelve al miembro a su canal de voz original
         await ctx.send(f'{member.name} ha sido devuelto a su canal original.')
+
 
 client.run(botToken)
