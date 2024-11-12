@@ -273,5 +273,4 @@ async def caracu(ctx: commands.Context, member: discord.Member):
         await member.move_to(original_channel)  # Devuelve al miembro a su canal de voz original
         await ctx.send(f'{member.name} ha sido devuelto a su canal original.')
 
-
 client.run(botToken)
