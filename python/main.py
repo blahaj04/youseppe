@@ -9,12 +9,12 @@ from flask import Flask
 from threading import Thread
 
 
-botToken = config('YOUSEPPE_TOKEN')
+botToken = config('YOUSEPPA_TOKEN')
 print(botToken)
 
 # Define the bot with all intents
 intents = discord.Intents.all()
-client = commands.Bot(command_prefix='!', intents=intents)
+client = commands.Bot(command_prefix='?', intents=intents)
 
 isPlaying = False
 
