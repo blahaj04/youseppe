@@ -64,6 +64,8 @@ class YTDLSource(discord.PCMVolumeTransformer):
         return cls(FFmpegPCMAudio(filename, **ffmpeg_opts), data=data)
 
 # Funcinones asincronas----------------------------------------------------------------------------------
+
+#esta funcion checkea si hay cosas en la cola pa reproducirlas con play_song
 async def play_next(ctx):
     global isPlaying
     
@@ -74,6 +76,10 @@ async def play_next(ctx):
     
     next_song_url = queue.pop(0)  # Obtiene y elimina la primera canción de la cola
     await play_song(ctx, next_song_url)  
+
+#Vale chat, este metodo es una cosa tela tela de fea y guarra
+# Lo que hace es que con el linkque le envias extrae la cancion de youtube y la reproduce en el bot. 
+# Una vez reproduce la cancion espera la duracion mas uno y llama al metodo de play_next.
 
 async def play_song(ctx, url):
     global isPlaying
@@ -139,14 +145,14 @@ async def byeee(ctx):
 @client.command()
 async def play(ctx: commands.Context, url: str):
     global isPlaying
-
+    #El if este del diablo checkea si estas en un canal de voz 
     if ctx.voice_client is None or not ctx.voice_client.is_connected():
         if ctx.author.voice:
             await ctx.author.voice.channel.connect()
         else:
             await ctx.send("No estás en ningún canal de voz. No puedo reproducir nada sin ti :(")
             return
-
+    #Configuraciones de la libreria esta del demonio pa sacar cosas del yutu
     ytdl_opts = {
         'format': 'bestaudio/best',
         'noplaylist': False,  # Permitir listas de reproducción
@@ -154,9 +160,12 @@ async def play(ctx: commands.Context, url: str):
         'default_search': 'auto',
         'source_address': '0.0.0.0'
     }
-
+    #Inicializa el "objeto" pa extraer el video
     ytdl = youtube_dl.YoutubeDL(ytdl_opts)
 
+    #Este try pilla el link que le envias y lo procesa segun si es una playlist o no
+    #Si es una playlist coje todas las url y las mete en una lista para poder manejar las canciones una a una (no va ni al cali)
+    #Si lo la mete en la lista directamente (aparentemente va del tiri) 
     try:
         info = ytdl.extract_info(url, download=False)
         
@@ -172,8 +181,9 @@ async def play(ctx: commands.Context, url: str):
             queue.append(url)  # Agregar una sola canción si no es lista
             await ctx.send(f'Se ha agregado a la cola: {info["title"]}')
         
+        #El if este va regulero porque el booleano va tela de mal creo
         if not isPlaying:
-            await play_next(ctx)  # Comienza a reproducir la primera canción si no hay otra en curso
+            await play_next(ctx)  
 
     except Exception as e:
         await ctx.send(f"Error al procesar la lista de reproducción o URL: {e}")
