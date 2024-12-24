@@ -135,7 +135,7 @@ async def byeee(ctx):
 
 # Comandos de voz----------------------------------------------------------------------------
     
-
+#He estaado debuggeando y puede ser que el booleano que hace check de si está reproduciendo se ralla. Mira tb el tiempo que se le mete de wait
 @client.command()
 async def play(ctx: commands.Context, url: str):
     global isPlaying
