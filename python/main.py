@@ -171,10 +171,12 @@ async def play(ctx: commands.Context, url: str):
         
         if 'entries' in info:  # Si es una lista de reproducción
             playlist = info['entries']
+            print(info) #Check de que carajos tiene esta lista petarda
             await ctx.send(f'Lista de reproducción agregada con {len(playlist)} canciones.')
 
             for entry in playlist:
                 video_url = entry['url']
+                print(video_url) #a ver que mierda tiene esta cosa rara
                 queue.append(video_url)  # Agregar la URL del video a la cola
                 await ctx.send(f'Se agregó a la cola: {entry["title"]}')  # Muestra el título de cada video agregado
         else:
