@@ -1,12 +1,10 @@
 import discord
 import asyncio
 from discord.ext import commands
-from discord import FFmpegPCMAudio
+from discord import FFmpegPCMAudio, app_commands
 from decouple import config
 import yt_dlp
-import random
-from flask import Flask
-from threading import Thread
+from typing import Optional
 
 botToken = config('YOUSEPPA_TOKEN')
 
@@ -23,11 +21,11 @@ isPlaying = False
 queue = []
 idle_time = 300  # Tiempo en segundos para desconectar si está inactivo
 
-
 # Eventos-----------------------------------------------------------------------------------------
 @client.event
 async def on_ready():
-    """ try:
+    """
+    try:
         await client.tree.sync()
         print("Comandos slash sincronizados en el server")
     except Exception as e:
@@ -60,7 +58,6 @@ ytdl_opts = {
 
 ytdl = yt_dlp.YoutubeDL(ytdl_opts)
 
-# 🔹 Clase para manejar la reproducción con yt-dlp
 class YTDLSource(discord.PCMVolumeTransformer):
     def __init__(self, source, *, data, volume=0.5):
         super().__init__(source, volume=volume)
@@ -78,10 +75,8 @@ class YTDLSource(discord.PCMVolumeTransformer):
         filename = data['url'] if stream else ytdl.prepare_filename(data)
         return cls(FFmpegPCMAudio(filename), data=data)
 
-# 🔹 Función para reproducir la siguiente canción en la cola
 async def play_next(guild):
     global isPlaying
-
     voice_client = guild.voice_client
     if not voice_client:
         return
@@ -103,22 +98,11 @@ async def play_next(guild):
     voice_client.play(player, after=after_play)
     await guild.system_channel.send(f'Reproduciendo ahora: {player.data["title"]}')
 
-
-# Comandos de texto--------------------------------------------------------------------------
-@client.tree.command(name="haiii", description="Dise haiii :3")
-async def haiii(interaction: discord.Interaction):
-    await interaction.response.send_message("haiii :3")
-
-@client.tree.command(name="byeee", description="Dise byeee :3")
-async def byeee(interaction: discord.Interaction):
-    await interaction.response.send_message("byeee :3")
-
 # Comandos de voz----------------------------------------------------------------------------
-@client.tree.command(name="play", description="Reproduce una canción. Si ya hay una en curso, la añade como la siguiente en la cola.")
+@client.tree.command(name="play", description="Reproduce una canción. Si ya hay una en curso, quita la actual y la reproduce sin afectar a la cola")
 async def play(interaction: discord.Interaction, url: str):
     global isPlaying
-    
-    await interaction.response.defer()  # Evita que la interacción expire
+    await interaction.response.defer()
     
     if not interaction.user.voice:
         await interaction.followup.send("Debes estar en un canal de voz para usar este comando.")
@@ -129,16 +113,16 @@ async def play(interaction: discord.Interaction, url: str):
         voice_client = await interaction.user.voice.channel.connect()
     
     if isPlaying:
-        queue.insert(0, url)  # Inserta la nueva canción justo después de la actual
-        await interaction.followup.send("Saltando la cancion actual. Reproduciendo " + url)
+        queue.insert(0,url)  # Añadir a la cola en lugar de interrumpir la canción actual
+        await interaction.followup.send("Canción añadida a la cola: " + url)
         voice_client = interaction.guild.voice_client
         if voice_client and voice_client.is_playing():
             voice_client.stop()
-        
     else:
-        queue.insert(0, url)  # Si no hay nada, agrégala normal
-        await play_next(interaction.guild)  # Inicia la reproducción
-        await interaction.followup.send("Reproduciendo " + url)
+        queue.insert(0, url)
+        await play_next(interaction.guild)
+        await interaction.followup.send("Reproduciendo: " + url)
+
 @client.tree.command(name="add", description="Añade una canción a la cola sin interrumpir la actual.")
 async def add(interaction: discord.Interaction, url: str):
     queue.append(url)
@@ -185,5 +169,61 @@ async def stop(interaction: discord.Interaction):
 
     isPlaying = False
     await interaction.response.send_message("Reproducción detenida y bot desconectado.")
+
+#Comandos grasiosos_________________________________________________________________________________________________________________________
+
+@client.tree.command(name="caracu", description="Envía hasta 5 usuarios a otro canal de voz unos segundos")
+@app_commands.describe(
+    user1="Primer usuario",
+    user2="Segundo usuario (opcional)",
+    user3="Tercer usuario (opcional)",
+    user4="Cuarto usuario (opcional)",
+    user5="Quinto usuario (opcional)"
+)
+async def caracu(
+    interaction: discord.Interaction,
+    user1: discord.Member,
+    user2: Optional[discord.Member] = None,
+    user3: Optional[discord.Member] = None,
+    user4: Optional[discord.Member] = None,
+    user5: Optional[discord.Member] = None
+):
+    await interaction.response.defer()  # Evita que la interacción expire
+
+    # Crear la lista de usuarios sin los None
+    members = [user for user in [user1, user2, user3, user4, user5] if user]
+
+    # Comprobar si todos están en un canal de voz
+    non_voice_members = [member for member in members if not member.voice]
+    if non_voice_members:
+        await interaction.followup.send(f'Los siguientes usuarios no están en un canal de voz: {", ".join(member.name for member in non_voice_members)}')
+        return
+
+    # Obtener el canal de castigo
+    channel = client.get_channel(int(config('CARACU_ID')))
+    if channel is None or not isinstance(channel, discord.VoiceChannel):
+        await interaction.followup.send(f'El canal de voz con ID "{channel}" no existe o no es un canal de voz.')
+        return
+
+    # Guardar los canales originales
+    original_channels = {member: member.voice.channel for member in members}
+
+    # Mover a los usuarios al canal de castigo
+    for member in members:
+        await member.move_to(channel)
+
+    await interaction.followup.send(f'Merecido caracu para {", ".join(member.name for member in members)}.')
+
+    # Esperar 5 segundos antes de devolverlos
+    await asyncio.sleep(5)
+
+    # Devolver a los usuarios a su canal original
+    for member, original_channel in original_channels.items():
+        if original_channel is not None:
+            await member.move_to(original_channel)
+
+    await interaction.followup.send(f'{", ".join(member.name for member in members)} han sido devueltos a su canal original.')
+
+
 
 client.run(botToken)
