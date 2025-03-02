@@ -75,7 +75,7 @@ class YTDLSource(discord.PCMVolumeTransformer):
         filename = data['url'] if stream else ytdl.prepare_filename(data)
         return cls(FFmpegPCMAudio(filename), data=data)
 
-async def play_next(guild):
+async def play_next(guild, channel):
     global isPlaying
     voice_client = guild.voice_client
     if not voice_client:
@@ -91,12 +91,14 @@ async def play_next(guild):
     isPlaying = True
     url = queue.pop(0)
     player = await YTDLSource.from_url(url, loop=client.loop, stream=True)
-    
+
     def after_play(error):
-        asyncio.run_coroutine_threadsafe(play_next(guild), client.loop)
+        asyncio.run_coroutine_threadsafe(play_next(guild, channel), client.loop)
 
     voice_client.play(player, after=after_play)
-    await guild.system_channel.send(f'Reproduciendo ahora: {player.data["title"]}')
+    
+    if channel:  # Enviar mensaje en el canal donde se ejecutó el comando
+        await channel.send(f'Reproduciendo ahora: {player.data["title"]}')
 
 # Comandos de voz----------------------------------------------------------------------------
 @client.tree.command(name="play", description="Reproduce una canción. Si ya hay una en curso, quita la actual y la reproduce sin afectar a la cola")
@@ -113,14 +115,13 @@ async def play(interaction: discord.Interaction, url: str):
         voice_client = await interaction.user.voice.channel.connect()
     
     if isPlaying:
-        queue.insert(0,url)  # Añadir a la cola en lugar de interrumpir la canción actual
+        queue.insert(0, url)  # Añadir a la cola en lugar de interrumpir la canción actual
         await interaction.followup.send("Canción añadida a la cola: " + url)
-        voice_client = interaction.guild.voice_client
         if voice_client and voice_client.is_playing():
             voice_client.stop()
     else:
         queue.insert(0, url)
-        await play_next(interaction.guild)
+        await play_next(interaction.guild, interaction.channel)  # Ahora pasa el canal
         await interaction.followup.send("Reproduciendo: " + url)
 
 @client.tree.command(name="add", description="Añade una canción a la cola sin interrumpir la actual.")
