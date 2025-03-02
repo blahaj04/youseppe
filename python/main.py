@@ -8,42 +8,34 @@ import random
 from flask import Flask
 from threading import Thread
 
-
 botToken = config('YOUSEPPA_TOKEN')
 
-# Define the bot with all intents
+# Define el bot con todos los intents
 class MiBot(commands.Bot):
     async def setup_hook(self):
-        await self.tree.sync() # Sincroniza los comandos con Discord
-        print("comandos internos sincronizados :3") 
+        await self.tree.sync()  # Sincroniza los comandos con Discord
+        print("Comandos internos sincronizados :3")
 
 intents = discord.Intents.all()
-client = MiBot(command_prefix = '?', intents=intents)
+client = MiBot(command_prefix='?', intents=intents)
 
 isPlaying = False
-
-# Cola de reproducción (ahora con tuplas para almacenar url y título)
 queue = []
+idle_time = 300  # Tiempo en segundos para desconectar si está inactivo
 
 
-    
 # Eventos-----------------------------------------------------------------------------------------
 @client.event
 async def on_ready():
-    try:
-        
+    """ try:
         await client.tree.sync()
         print("Comandos slash sincronizados en el server")
     except Exception as e:
         print(f"Error al sincronizar comandos: {e}")
-    
-    if(client.command_prefix == '?'):
-        print("Youseppa está despierta ;3")
-        print("---------------------------")
-    else:
-        print("Youseppe está despierto ;3")
-        print("---------------------------")
-    
+    """
+    print("Youseppe está despierto ;3")
+    print("---------------------------")
+
 @client.event
 async def on_member_join(member):
     channel = client.get_channel(int(config('BIENVENIDO_ID')))
@@ -55,62 +47,143 @@ async def on_member_ban(member):
     channel = client.get_channel(int(config('BIENVENIDO_ID')))
     if channel:
         await channel.send(f"sacaio {member.name}")
-        
-# Funcinones asincronas----------------------------------------------------------------------------------
+
+# Funciones de reproducción------------------------------------------------------------------------
+ytdl_opts = {
+    'format': 'bestaudio/best',
+    'noplaylist': True,
+    'nocheckcertificate': True,
+    'quiet': True,
+    'default_search': 'auto',
+    'source_address': '0.0.0.0',
+}
+
+ytdl = yt_dlp.YoutubeDL(ytdl_opts)
+
+# 🔹 Clase para manejar la reproducción con yt-dlp
+class YTDLSource(discord.PCMVolumeTransformer):
+    def __init__(self, source, *, data, volume=0.5):
+        super().__init__(source, volume=volume)
+        self.data = data
+
+    @classmethod
+    async def from_url(cls, url: str, *, loop=None, stream=True):
+        loop = loop or asyncio.get_event_loop()
+        try:
+            data = await loop.run_in_executor(None, lambda: ytdl.extract_info(url, download=not stream))
+        except yt_dlp.utils.DownloadError as e:
+            raise commands.CommandError(f"Error descargando video: {e}")
+        if 'entries' in data:
+            data = data['entries'][0]
+        filename = data['url'] if stream else ytdl.prepare_filename(data)
+        return cls(FFmpegPCMAudio(filename), data=data)
+
+# 🔹 Función para reproducir la siguiente canción en la cola
+async def play_next(guild):
+    global isPlaying
+
+    voice_client = guild.voice_client
+    if not voice_client:
+        return
+
+    if len(queue) == 0:
+        isPlaying = False
+        await asyncio.sleep(idle_time)
+        if not isPlaying and voice_client.is_connected():
+            await voice_client.disconnect()
+        return
+
+    isPlaying = True
+    url = queue.pop(0)
+    player = await YTDLSource.from_url(url, loop=client.loop, stream=True)
+    
+    def after_play(error):
+        asyncio.run_coroutine_threadsafe(play_next(guild), client.loop)
+
+    voice_client.play(player, after=after_play)
+    await guild.system_channel.send(f'Reproduciendo ahora: {player.data["title"]}')
 
 
 # Comandos de texto--------------------------------------------------------------------------
-
-@client.tree.command(name= "haiii", description= "Dise haiii :3")
+@client.tree.command(name="haiii", description="Dise haiii :3")
 async def haiii(interaction: discord.Interaction):
     await interaction.response.send_message("haiii :3")
 
-@client.tree.command(name= "byeee", description= "Dise byeee :3")
+@client.tree.command(name="byeee", description="Dise byeee :3")
 async def byeee(interaction: discord.Interaction):
     await interaction.response.send_message("byeee :3")
 
 # Comandos de voz----------------------------------------------------------------------------
-
-
-#Comandos de gestion de usuario----------------------------------------------------------------------------------
-@client.tree.command(name="caracu", description="Envía a un usuario a otro canal de voz unos segundos")
-async def caracu(interaction: discord.Interaction, member: discord.Member):
-    # Obtén el canal de voz usando el ID
-    channel = client.get_channel(int(config('CARACU_ID')))
+@client.tree.command(name="play", description="Reproduce una canción. Si ya hay una en curso, la añade como la siguiente en la cola.")
+async def play(interaction: discord.Interaction, url: str):
+    global isPlaying
     
-    if channel is None or not isinstance(channel, discord.VoiceChannel):
-        await interaction.response.send_message(f'El canal de voz con ID "{channel}" no existe o no es un canal de voz.')
+    await interaction.response.defer()  # Evita que la interacción expire
+    
+    if not interaction.user.voice:
+        await interaction.followup.send("Debes estar en un canal de voz para usar este comando.")
         return
-
-    if not member.voice:
-        await interaction.response.send_message(f'{member.name} no está en ningún canal de voz.')
-        return
-
-    original_channel = member.voice.channel  # Guardar el canal original del miembro
-
-    # Mueve al miembro al canal de voz especificado
-    await member.move_to(channel)
-    await interaction.response.send_message(f'Merecido caracu {member.name}')
-
-    # Leer el archivo de GIFs y seleccionar uno al azar
-    try:
-        with open("./.txt/gifs.txt", "r") as file:
-            gifs = file.readlines()
-        if gifs:
-            gif_url = random.choice(gifs).strip()  # Selecciona un GIF aleatorio y elimina espacios en blanco
-            await interaction.followup.send(gif_url)  # Envía el enlace del GIF seleccionado
-        else:
-            await interaction.followup.send("No se encontraron GIFs en el archivo.")
-    except FileNotFoundError:
-        await interaction.followup.send("El archivo de GIFs no fue encontrado.")
-    except Exception as e:
-        await interaction.followup.send(f"Ocurrió un error: {e}")
-
-    # Espera 5 segundos antes de devolver al miembro al canal original
-    await asyncio.sleep(5)
-
-    if original_channel is not None:  # Asegúrate de que el canal original sigue siendo válido
-        await member.move_to(original_channel)  # Devuelve al miembro a su canal de voz original
-        await interaction.followup.send(f'{member.name} ha sido devuelto a su canal original.')
+    
+    voice_client = interaction.guild.voice_client
+    if not voice_client or not voice_client.is_connected():
+        voice_client = await interaction.user.voice.channel.connect()
+    
+    if isPlaying:
+        queue.insert(0, url)  # Inserta la nueva canción justo después de la actual
+        await interaction.followup.send("Saltando la cancion actual. Reproduciendo " + url)
+        voice_client = interaction.guild.voice_client
+        if voice_client and voice_client.is_playing():
+            voice_client.stop()
         
+    else:
+        queue.insert(0, url)  # Si no hay nada, agrégala normal
+        await play_next(interaction.guild)  # Inicia la reproducción
+        await interaction.followup.send("Reproduciendo " + url)
+@client.tree.command(name="add", description="Añade una canción a la cola sin interrumpir la actual.")
+async def add(interaction: discord.Interaction, url: str):
+    queue.append(url)
+    await interaction.response.send_message("Canción añadida a la cola.")
+
+@client.tree.command(name="pause", description="Pausa la canción actual.")
+async def pause(interaction: discord.Interaction):
+    voice_client = interaction.guild.voice_client
+    if voice_client and voice_client.is_playing():
+        voice_client.pause()
+        await interaction.response.send_message("Música pausada.")
+    else:
+        await interaction.response.send_message("No hay ninguna canción en reproducción.")
+
+@client.tree.command(name="resume", description="Reanuda la canción pausada.")
+async def resume(interaction: discord.Interaction):
+    voice_client = interaction.guild.voice_client
+    if voice_client and voice_client.is_paused():
+        voice_client.resume()
+        await interaction.response.send_message("Música reanudada.")
+    else:
+        await interaction.response.send_message("No hay ninguna canción pausada.")
+
+@client.tree.command(name="skip", description="Salta a la siguiente canción de la cola.")
+async def skip(interaction: discord.Interaction):
+    voice_client = interaction.guild.voice_client
+    if voice_client and voice_client.is_playing():
+        voice_client.stop()
+        await interaction.response.send_message("Canción saltada.")
+    else:
+        await interaction.response.send_message("No hay ninguna canción en reproducción.")
+
+@client.tree.command(name="stop", description="Detiene la reproducción y desconecta el bot si está inactivo.")
+async def stop(interaction: discord.Interaction):
+    global isPlaying
+    voice_client = interaction.guild.voice_client
+    queue.clear()
+
+    if voice_client and voice_client.is_playing():
+        voice_client.stop()
+    
+    if voice_client:
+        await voice_client.disconnect()
+
+    isPlaying = False
+    await interaction.response.send_message("Reproducción detenida y bot desconectado.")
+
 client.run(botToken)
