@@ -24,13 +24,13 @@ idle_time = 300  # Tiempo en segundos para desconectar si está inactivo
 # Eventos-----------------------------------------------------------------------------------------
 @client.event
 async def on_ready():
-    """
+    
     try:
         await client.tree.sync()
         print("Comandos slash sincronizados en el server")
     except Exception as e:
         print(f"Error al sincronizar comandos: {e}")
-    """
+    
     print("Youseppe está despierto ;3")
     print("---------------------------")
 
@@ -38,13 +38,25 @@ async def on_ready():
 async def on_member_join(member):
     channel = client.get_channel(int(config('BIENVENIDO_ID')))
     if channel:
-        await channel.send(f"tevacae {member.name}")
+        await channel.send(f"De donde habeis sacao a {member.name}?")
 
 @client.event
 async def on_member_ban(member):
     channel = client.get_channel(int(config('BIENVENIDO_ID')))
     if channel:
-        await channel.send(f"sacaio {member.name}")
+        await channel.send(f"baneo por perra pa {member.name}")
+
+@client.event
+async def on_member_remove(member):
+    channel = client.get_channel(int(config('BIENVENIDO_ID')))
+    if channel:
+        await channel.send(f"Te va {member.name}? . Po llévate esta ;)")
+
+@client.event
+async def on_member_kick(member):
+    channel = client.get_channel(int(config('BIENVENIDO_ID')))
+    if channel:
+        await channel.send(f"{member.name} ha sido expulsado del servidor. Hasta nunca >:D")
 
 # Funciones de reproducción------------------------------------------------------------------------
 ytdl_opts = {
@@ -99,6 +111,16 @@ async def play_next(guild, channel):
     
     if channel:  # Enviar mensaje en el canal donde se ejecutó el comando
         await channel.send(f'Reproduciendo ahora: {player.data["title"]}')
+
+# Comandos de texto--------------------------------------------------------------------------
+
+@client.tree.command(name="haiii", description="Dice haiii :3")
+async def haiii(interaction: discord.Interaction):
+    await interaction.response.send_message("haiii :3")
+
+@client.tree.command(name="byeee", description="Dice byeee :3")
+async def byeee(interaction: discord.Interaction):
+    await interaction.response.send_message("byeee :3")
 
 # Comandos de voz----------------------------------------------------------------------------
 @client.tree.command(name="play", description="Reproduce una canción. Si ya hay una en curso, quita la actual y la reproduce sin afectar a la cola")
