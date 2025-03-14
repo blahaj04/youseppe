@@ -1,2 +1,4 @@
 .env
 ffmpeg
+python/__pycache__
+output.log
