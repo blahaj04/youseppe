@@ -6,7 +6,7 @@ from decouple import config
 import yt_dlp
 from typing import Optional
 
-botToken = config('YOUSEPPA_TOKEN')
+botToken = config('YOUSEPPE_TOKEN')
 
 # Define el bot con todos los intents
 class MiBot(commands.Bot):
