@@ -1,276 +1,252 @@
 import discord
 import asyncio
 from discord.ext import commands
-from discord import FFmpegPCMAudio
+from discord import FFmpegPCMAudio, app_commands
 from decouple import config
-import yt_dlp as youtube_dl
-import random
-from flask import Flask
-from threading import Thread
+import yt_dlp
+from typing import Optional
 
+botToken = config('YOUSEPPA_TOKEN')
 
-botToken = config('YOUSEPPE_TOKEN')
-print(botToken)
+# Define el bot con todos los intents
+class MiBot(commands.Bot):
+    async def setup_hook(self):
+        await self.tree.sync()  # Sincroniza los comandos con Discord
+        print("Comandos internos sincronizados :3")
 
-# Define the bot with all intents
 intents = discord.Intents.all()
-client = commands.Bot(command_prefix='!', intents=intents)
+client = MiBot(command_prefix='?', intents=intents)
 
 isPlaying = False
-
-# Cola de reproducción (ahora con tuplas para almacenar url y título)
 queue = []
+idle_time = 300  # Tiempo en segundos para desconectar si está inactivo
 
-# Configuration for yt_dlp
+# Eventos-----------------------------------------------------------------------------------------
+@client.event
+async def on_ready():
+    
+    try:
+        await client.tree.sync()
+        print("Comandos slash sincronizados en el server")
+    except Exception as e:
+        print(f"Error al sincronizar comandos: {e}")
+    
+    print("Youseppe está despierto ;3")
+    print("---------------------------")
+
+@client.event
+async def on_member_join(member):
+    channel = client.get_channel(int(config('BIENVENIDO_ID')))
+    if channel:
+        await channel.send(f"De donde habeis sacao a {member.name}?")
+
+@client.event
+async def on_member_ban(member):
+    channel = client.get_channel(int(config('BIENVENIDO_ID')))
+    if channel:
+        await channel.send(f"baneo por perra pa {member.name}")
+
+@client.event
+async def on_member_remove(member):
+    channel = client.get_channel(int(config('BIENVENIDO_ID')))
+    if channel:
+        await channel.send(f"Te va {member.name}? . Po llévate esta ;)")
+
+@client.event
+async def on_member_kick(member):
+    channel = client.get_channel(int(config('BIENVENIDO_ID')))
+    if channel:
+        await channel.send(f"{member.name} ha sido expulsado del servidor. Hasta nunca >:D")
+
+# Funciones de reproducción------------------------------------------------------------------------
+ytdl_opts = {
+    'format': 'bestaudio/best',
+    'noplaylist': True,
+    'nocheckcertificate': True,
+    'quiet': True,
+    'default_search': 'auto',
+    'source_address': '0.0.0.0',
+}
+
+ytdl = yt_dlp.YoutubeDL(ytdl_opts)
+
 class YTDLSource(discord.PCMVolumeTransformer):
     def __init__(self, source, *, data, volume=0.5):
         super().__init__(source, volume=volume)
         self.data = data
 
     @classmethod
-    async def from_url(cls, url: str, *, loop=None, stream=False):
-        ytdl_opts = {
-            'format': 'bestaudio/best',
-            'noplaylist': True,
-            'nocheckcertificate': True,
-            'quiet': True,
-            'default_search': 'auto',
-            'source_address': '0.0.0.0'
-        }
-
-        ytdl = youtube_dl.YoutubeDL(ytdl_opts)
+    async def from_url(cls, url: str, *, loop=None, stream=True):
         loop = loop or asyncio.get_event_loop()
-        
-        ffmpeg_opts = {
-            'before_options': (
-                '-reconnect 1 -reconnect_streamed 1 '
-                '-reconnect_delay_max 5'
-            ),
-            'options': '-vn'
-        }
-
         try:
             data = await loop.run_in_executor(None, lambda: ytdl.extract_info(url, download=not stream))
-        except youtube_dl.DownloadError as e:
-            raise commands.CommandError(f"Error downloading video: {e}")
-        except Exception as e:
-            raise commands.CommandError(f"Unexpected error: {e}")
-
+        except yt_dlp.utils.DownloadError as e:
+            raise commands.CommandError(f"Error descargando video: {e}")
         if 'entries' in data:
             data = data['entries'][0]
-
         filename = data['url'] if stream else ytdl.prepare_filename(data)
+        return cls(FFmpegPCMAudio(filename), data=data)
 
-        return cls(FFmpegPCMAudio(filename, **ffmpeg_opts), data=data)
-
-# Funcinones asincronas----------------------------------------------------------------------------------
-async def play_next(ctx):
+async def play_next(guild, channel):
     global isPlaying
-    
-    if len(queue) == 0:
-        isPlaying = False  # No hay más canciones en la cola
+    voice_client = guild.voice_client
+    if not voice_client:
         return
 
-    
-    next_song_url = queue.pop(0)  # Obtiene y elimina la primera canción de la cola
-    await play_song(ctx, next_song_url)  
-
-async def play_song(ctx, url):
-    global isPlaying
-    
-    
-    try:
-        
-        ytdl = youtube_dl.YoutubeDL({'format': 'bestaudio/best'})
-        info = ytdl.extract_info(url, download=False)
-        title = info['title']  
-        duration = info['duration']
-
-        
-        player = await YTDLSource.from_url(url, loop=client.loop, stream=True)
-        ctx.voice_client.play(player)
-        
-        isPlaying = True
-        await ctx.send(f'Reproduciendo ahora: {title}, {url}')
-
-        await asyncio.sleep(duration + 1)  # Espera la duración de la canción + 1 segundo
+    if len(queue) == 0:
         isPlaying = False
+        await asyncio.sleep(idle_time)
+        if not isPlaying and voice_client.is_connected():
+            await voice_client.disconnect()
+        return
 
-        await play_next(ctx)  # Llama a play_next después de que la canción termine
+    isPlaying = True
+    url = queue.pop(0)
+    player = await YTDLSource.from_url(url, loop=client.loop, stream=True)
 
-    except commands.CommandError as e:
-        await ctx.send(f"An error occurred: {e}")
-    except Exception as e:
-        await ctx.send(f"Unexpected error: {e}")
+    def after_play(error):
+        asyncio.run_coroutine_threadsafe(play_next(guild, channel), client.loop)
+
+    voice_client.play(player, after=after_play)
     
-        
-# Eventos-----------------------------------------------------------------------------------------
-@client.event
-async def on_ready():
-    print("Youseppe está despierto ;3")
-    print("---------------------------")
-    await client.tree.sync()
-    
-@client.event
-async def on_member_join(member):
-    channel = client.get_channel(int(config('BIENVENIDO_ID')))
-    if channel:
-        await channel.send(f"tevacae {member.name}")
+    if channel:  # Enviar mensaje en el canal donde se ejecutó el comando
+        await channel.send(f'Reproduciendo ahora: {player.data["title"]}')
 
-@client.event
-async def on_member_ban(member):
-    channel = client.get_channel(int(config('BIENVENIDO_ID')))
-    if channel:
-        await channel.send(f"sacaio {member.name}")
-        
 # Comandos de texto--------------------------------------------------------------------------
 
-@client.command()
-async def haiii(ctx):
-    await ctx.send("haiii :3")
+@client.tree.command(name="haiii", description="Dice haiii :3")
+async def haiii(interaction: discord.Interaction):
+    await interaction.response.send_message("haiii :3")
 
-@client.command()
-async def byeee(ctx):
-    await ctx.send("byeee :3")
+@client.tree.command(name="byeee", description="Dice byeee :3")
+async def byeee(interaction: discord.Interaction):
+    await interaction.response.send_message("byeee :3")
 
 # Comandos de voz----------------------------------------------------------------------------
-    
-
-@client.command()
-async def play(ctx: commands.Context, url: str):
+@client.tree.command(name="play", description="Reproduce una canción. Si ya hay una en curso, quita la actual y la reproduce sin afectar a la cola")
+async def play(interaction: discord.Interaction, url: str):
     global isPlaying
-
-    if ctx.voice_client is None or not ctx.voice_client.is_connected():
-        if ctx.author.voice:
-            await ctx.author.voice.channel.connect()
-        else:
-            await ctx.send("No estás en ningún canal de voz. No puedo reproducir nada sin ti :(")
-            return
-
-    ytdl_opts = {
-        'format': 'bestaudio/best',
-        'noplaylist': False,  # Permitir listas de reproducción
-        'quiet': True,
-        'default_search': 'auto',
-        'source_address': '0.0.0.0'
-    }
-
-    ytdl = youtube_dl.YoutubeDL(ytdl_opts)
-
-    try:
-        info = ytdl.extract_info(url, download=False)
-        
-        if 'entries' in info:  # Si es una lista de reproducción
-            playlist = info['entries']
-            await ctx.send(f'Lista de reproducción agregada con {len(playlist)} canciones.')
-
-            for entry in playlist:
-                video_url = entry['url']
-                queue.append(video_url)  # Agregar la URL del video a la cola
-                await ctx.send(f'Se agregó a la cola: {entry["title"]}')  # Muestra el título de cada video agregado
-        else:
-            queue.append(url)  # Agregar una sola canción si no es lista
-            await ctx.send(f'Se ha agregado a la cola: {info["title"]}')
-        
-        if not isPlaying:
-            await play_next(ctx)  # Comienza a reproducir la primera canción si no hay otra en curso
-
-    except Exception as e:
-        await ctx.send(f"Error al procesar la lista de reproducción o URL: {e}")
-
-   
-@client.command()
-async def add(ctx: commands.Context, url: str):
-    queue.append(url)  # Agrega la URL a la cola
-    await ctx.send(f'Se ha agregado a la cola: {url}')
+    await interaction.response.defer()
     
-@client.command()
-async def stop(ctx: commands.Context):
-    global isPlaying  # Asegúrate de que sea la variable global
-    if ctx.voice_client:
-        queue.clear()  # Vacía la cola cuando se detiene la reproducción
-        await ctx.voice_client.disconnect()
-        isPlaying = False  # Cambia a False al detener la música
+    if not interaction.user.voice:
+        await interaction.followup.send("Debes estar en un canal de voz para usar este comando.")
+        return
+    
+    voice_client = interaction.guild.voice_client
+    if not voice_client or not voice_client.is_connected():
+        voice_client = await interaction.user.voice.channel.connect()
+    
+    if isPlaying:
+        queue.insert(0, url)  # Añadir a la cola en lugar de interrumpir la canción actual
+        await interaction.followup.send("Canción añadida a la cola: " + url)
+        if voice_client and voice_client.is_playing():
+            voice_client.stop()
     else:
-        await ctx.send("No estoy en ningun canal de voz. ¿Es que no me quieres aqui? :(")
+        queue.insert(0, url)
+        await play_next(interaction.guild, interaction.channel)  # Ahora pasa el canal
+        await interaction.followup.send("Reproduciendo: " + url)
 
-@client.command()
-async def skip(ctx: commands.Context):
-    if ctx.voice_client and ctx.voice_client.is_playing():
-        ctx.voice_client.stop()  # Detiene la canción actual
-        await ctx.send("Canción saltada. Reproduciendo la siguiente en la cola...")
-        await play_next(ctx)
+@client.tree.command(name="add", description="Añade una canción a la cola sin interrumpir la actual.")
+async def add(interaction: discord.Interaction, url: str):
+    queue.append(url)
+    await interaction.response.send_message("Canción añadida a la cola.")
+
+@client.tree.command(name="pause", description="Pausa la canción actual.")
+async def pause(interaction: discord.Interaction):
+    voice_client = interaction.guild.voice_client
+    if voice_client and voice_client.is_playing():
+        voice_client.pause()
+        await interaction.response.send_message("Música pausada.")
     else:
-        await ctx.send("No hay ninguna canción reproduciéndose en este momento.")
+        await interaction.response.send_message("No hay ninguna canción en reproducción.")
 
-@client.command()
-async def pause(ctx: commands.Context):
-    if ctx.voice_client and ctx.voice_client.is_playing():
-        ctx.voice_client.pause()
-        await ctx.send("Música pausada")
+@client.tree.command(name="resume", description="Reanuda la canción pausada.")
+async def resume(interaction: discord.Interaction):
+    voice_client = interaction.guild.voice_client
+    if voice_client and voice_client.is_paused():
+        voice_client.resume()
+        await interaction.response.send_message("Música reanudada.")
     else:
-        await ctx.send("ZA WARUDO. Ups, solo funciona cuando reproduzco algo :(")
+        await interaction.response.send_message("No hay ninguna canción pausada.")
 
-@client.command()
-async def resume(ctx: commands.Context):
-    if ctx.voice_client and ctx.voice_client.is_paused():
-        ctx.voice_client.resume()
-        await ctx.send("Resumiendo música")
+@client.tree.command(name="skip", description="Salta a la siguiente canción de la cola.")
+async def skip(interaction: discord.Interaction):
+    voice_client = interaction.guild.voice_client
+    if voice_client and voice_client.is_playing():
+        voice_client.stop()
+        await interaction.response.send_message("Canción saltada.")
     else:
-        await ctx.send("TOKI WA UGOKIDASU. Upsie, primero tengo que parar algo, ¿no crees :p?")
+        await interaction.response.send_message("No hay ninguna canción en reproducción.")
 
-@play.before_invoke
-async def ensure_voice(ctx: commands.Context):
-    if ctx.voice_client is None:
-        if ctx.author.voice:
-            await ctx.author.voice.channel.connect()
-        else:
-            await ctx.send("No estás en ningún canal de voz. No querrás que reproduzca algo sin tí, ¿no? :(")
-            raise commands.CommandError("El usuario no está conectado en ningún canal de voz")
-    elif ctx.voice_client.is_playing():
-        ctx.voice_client.stop()
+@client.tree.command(name="stop", description="Detiene la reproducción y desconecta el bot si está inactivo.")
+async def stop(interaction: discord.Interaction):
+    global isPlaying
+    voice_client = interaction.guild.voice_client
+    queue.clear()
 
-#Comandos grasiosos----------------------------------------------------------------------------------
+    if voice_client and voice_client.is_playing():
+        voice_client.stop()
+    
+    if voice_client:
+        await voice_client.disconnect()
 
+    isPlaying = False
+    await interaction.response.send_message("Reproducción detenida y bot desconectado.")
 
-@client.command()
-async def caracu(ctx: commands.Context, member: discord.Member):
-    # Obtén el canal de voz usando el ID
+#Comandos grasiosos_________________________________________________________________________________________________________________________
+
+@client.tree.command(name="caracu", description="Envía hasta 5 usuarios a otro canal de voz unos segundos")
+@app_commands.describe(
+    user1="Primer usuario",
+    user2="Segundo usuario (opcional)",
+    user3="Tercer usuario (opcional)",
+    user4="Cuarto usuario (opcional)",
+    user5="Quinto usuario (opcional)"
+)
+async def caracu(
+    interaction: discord.Interaction,
+    user1: discord.Member,
+    user2: Optional[discord.Member] = None,
+    user3: Optional[discord.Member] = None,
+    user4: Optional[discord.Member] = None,
+    user5: Optional[discord.Member] = None
+):
+    await interaction.response.defer()  # Evita que la interacción expire
+
+    # Crear la lista de usuarios sin los None
+    members = [user for user in [user1, user2, user3, user4, user5] if user]
+
+    # Comprobar si todos están en un canal de voz
+    non_voice_members = [member for member in members if not member.voice]
+    if non_voice_members:
+        await interaction.followup.send(f'Los siguientes usuarios no están en un canal de voz: {", ".join(member.name for member in non_voice_members)}')
+        return
+
+    # Obtener el canal de castigo
     channel = client.get_channel(int(config('CARACU_ID')))
-    
     if channel is None or not isinstance(channel, discord.VoiceChannel):
-        await ctx.send(f'El canal de voz con ID "{channel}" no existe o no es un canal de voz.')
+        await interaction.followup.send(f'El canal de voz con ID "{channel}" no existe o no es un canal de voz.')
         return
 
-    if not member.voice:
-        await ctx.send(f'{member.name} no está en ningún canal de voz.')
-        return
+    # Guardar los canales originales
+    original_channels = {member: member.voice.channel for member in members}
 
-    original_channel = member.voice.channel  # Guardar el canal original del miembro
+    # Mover a los usuarios al canal de castigo
+    for member in members:
+        await member.move_to(channel)
 
-    # Mueve al miembro al canal de voz especificado
-    await member.move_to(channel)
-    await ctx.send(f'Merecido caracu {member.name}')
+    await interaction.followup.send(f'Merecido caracu para {", ".join(member.name for member in members)}.')
 
-    # Leer el archivo de GIFs y seleccionar uno al azar
-    try:
-        with open("./.txt/gifs.txt", "r") as file:
-            gifs = file.readlines()
-        if gifs:
-            gif_url = random.choice(gifs).strip()  # Selecciona un GIF aleatorio y elimina espacios en blanco
-            await ctx.send(gif_url)  # Envía el enlace del GIF seleccionado
-        else:
-            await ctx.send("No se encontraron GIFs en el archivo.")
-    except FileNotFoundError:
-        await ctx.send("El archivo de GIFs no fue encontrado.")
-    except Exception as e:
-        await ctx.send(f"Ocurrió un error: {e}")
-
-    # Espera 5 segundos antes de devolver al miembro al canal original
+    # Esperar 5 segundos antes de devolverlos
     await asyncio.sleep(5)
 
-    if original_channel is not None:  # Asegúrate de que el canal original sigue siendo válido
-        await member.move_to(original_channel)  # Devuelve al miembro a su canal de voz original
-        await ctx.send(f'{member.name} ha sido devuelto a su canal original.')
+    # Devolver a los usuarios a su canal original
+    for member, original_channel in original_channels.items():
+        if original_channel is not None:
+            await member.move_to(original_channel)
+
+    await interaction.followup.send(f'{", ".join(member.name for member in members)} han sido devueltos a su canal original.')
+
+
 
 client.run(botToken)
