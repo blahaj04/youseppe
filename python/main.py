@@ -24,13 +24,13 @@ idle_time = 300  # Tiempo en segundos para desconectar si está inactivo
 # Eventos-----------------------------------------------------------------------------------------
 @client.event
 async def on_ready():
-    
+    """
     try:
         await client.tree.sync()
         print("Comandos slash sincronizados en el server")
     except Exception as e:
         print(f"Error al sincronizar comandos: {e}")
-    
+    """
     print("Youseppe está despierto ;3")
     print("---------------------------")
 
@@ -67,6 +67,10 @@ ytdl_opts = {
     'default_search': 'auto',
     'source_address': '0.0.0.0',
 }
+ffmpeg_opts = {
+    'before_options': '-reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 5 -multiple_requests 1',
+    'options': '-vn'
+}
 
 ytdl = yt_dlp.YoutubeDL(ytdl_opts)
 
@@ -85,7 +89,7 @@ class YTDLSource(discord.PCMVolumeTransformer):
         if 'entries' in data:
             data = data['entries'][0]
         filename = data['url'] if stream else ytdl.prepare_filename(data)
-        return cls(FFmpegPCMAudio(filename), data=data)
+        return cls(FFmpegPCMAudio(filename, **ffmpeg_opts), data=data)
 
 async def play_next(guild, channel):
     global isPlaying
