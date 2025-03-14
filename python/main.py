@@ -5,6 +5,7 @@ from discord import FFmpegPCMAudio, app_commands
 from decouple import config
 import yt_dlp
 from typing import Optional
+import log_manager
 
 botToken = config('YOUSEPPE_TOKEN')
 
