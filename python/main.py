@@ -62,11 +62,16 @@ async def on_member_kick(member):
 # Funciones de reproducción------------------------------------------------------------------------
 ytdl_opts = {
     'format': 'bestaudio/best',
-    'noplaylist': True,
+    'noplaylist': False,  # Permite extraer listas de reproducción
+    'extract_flat': True,  # No descarga, solo obtiene URLs
     'nocheckcertificate': True,
     'quiet': True,
     'default_search': 'auto',
     'source_address': '0.0.0.0',
+    'geo_bypass': True,  # Evita restricciones de país
+    'geo_bypass_country': 'US',  # Usa un país sin bloqueos
+    'logtostderr': True,  # Forzar logs en stderr
+    'verbose': True,  # Modo detallado
 }
 ffmpeg_opts = {
     'before_options': '-reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 5 -multiple_requests 1',
@@ -86,11 +91,14 @@ class YTDLSource(discord.PCMVolumeTransformer):
         try:
             data = await loop.run_in_executor(None, lambda: ytdl.extract_info(url, download=not stream))
         except yt_dlp.utils.DownloadError as e:
-            raise commands.CommandError(f"Error descargando video: {e}")
+            print(f"[ERROR] No se pudo descargar el video: {e}")
+            return None  # Devuelve None si hay un error
+
         if 'entries' in data:
             data = data['entries'][0]
+
         filename = data['url'] if stream else ytdl.prepare_filename(data)
-        return cls(FFmpegPCMAudio(filename, **ffmpeg_opts), data=data)
+        return cls(FFmpegPCMAudio(filename), data=data)
 
 async def play_next(guild, channel):
     global isPlaying
@@ -98,24 +106,30 @@ async def play_next(guild, channel):
     if not voice_client:
         return
 
-    if len(queue) == 0:
-        isPlaying = False
-        await asyncio.sleep(idle_time)
-        if not isPlaying and voice_client.is_connected():
-            await voice_client.disconnect()
+    while queue:
+        url = queue.pop(0)  # Obtiene el siguiente video
+        player = await YTDLSource.from_url(url, loop=client.loop, stream=True)
+
+        if player is None:  # Si el video no se pudo descargar, pasa al siguiente
+            print(f"[AVISO] Video no disponible. Saltando...")
+            continue  # Intenta el siguiente video en la cola
+        
+        isPlaying = True
+
+        def after_play(error):
+            asyncio.run_coroutine_threadsafe(play_next(guild, channel), client.loop)
+
+        voice_client.play(player, after=after_play)
+
+        if channel:
+            await channel.send(f'Reproduciendo ahora: {player.data["title"]}')
         return
 
-    isPlaying = True
-    url = queue.pop(0)
-    player = await YTDLSource.from_url(url, loop=client.loop, stream=True)
-
-    def after_play(error):
-        asyncio.run_coroutine_threadsafe(play_next(guild, channel), client.loop)
-
-    voice_client.play(player, after=after_play)
-    
-    if channel:  # Enviar mensaje en el canal donde se ejecutó el comando
-        await channel.send(f'Reproduciendo ahora: {player.data["title"]}')
+    # Si la cola está vacía después de intentar todos los videos
+    isPlaying = False
+    await asyncio.sleep(idle_time)
+    if not isPlaying and voice_client.is_connected():
+        await voice_client.disconnect()
 
 # Comandos de texto--------------------------------------------------------------------------
 
@@ -128,28 +142,39 @@ async def byeee(interaction: discord.Interaction):
     await interaction.response.send_message("byeee :3")
 
 # Comandos de voz----------------------------------------------------------------------------
-@client.tree.command(name="play", description="Reproduce una canción. Si ya hay una en curso, quita la actual y la reproduce sin afectar a la cola")
+@client.tree.command(name="play", description="Reproduce una canción o añade una playlist a la cola.")
 async def play(interaction: discord.Interaction, url: str):
     global isPlaying
     await interaction.response.defer()
-    
+
     if not interaction.user.voice:
         await interaction.followup.send("Debes estar en un canal de voz para usar este comando.")
         return
-    
+
     voice_client = interaction.guild.voice_client
     if not voice_client or not voice_client.is_connected():
         voice_client = await interaction.user.voice.channel.connect()
-    
-    if isPlaying:
-        queue.insert(0, url)  # Añadir a la cola en lugar de interrumpir la canción actual
-        await interaction.followup.send("Canción añadida a la cola: " + url)
-        if voice_client and voice_client.is_playing():
-            voice_client.stop()
-    else:
-        queue.insert(0, url)
-        await play_next(interaction.guild, interaction.channel)  # Ahora pasa el canal
-        await interaction.followup.send("Reproduciendo: " + url)
+
+    try:
+        info = ytdl.extract_info(url, download=False)
+
+        if 'entries' in info:
+            # Es una playlist, añadimos todas las canciones disponibles
+            song_urls = [entry['url'] for entry in info['entries'] if entry and 'url' in entry]
+            queue.extend(song_urls)
+            await interaction.followup.send(f"Se añadieron {len(song_urls)} canciones a la cola.")
+        else:
+            # Es una canción individual
+            queue.append(info['url'])
+            await interaction.followup.send(f"Se añadió **{info['title']}** a la cola.")
+
+    except Exception as e:
+        await interaction.followup.send(f"Error al obtener la playlist: {e}")
+        return
+
+    if not isPlaying:
+        await play_next(interaction.guild, interaction.channel)
+
 
 @client.tree.command(name="add", description="Añade una canción a la cola sin interrumpir la actual.")
 async def add(interaction: discord.Interaction, url: str):
